@@ -1,0 +1,8 @@
+# Pydantic AI with OpenAI support
+pydantic-ai[openai]>=0.0.20
+
+# Gradio frontend
+gradio>=4.0.0
+
+# Load .env into environment
+python-dotenv>=1.0.0
