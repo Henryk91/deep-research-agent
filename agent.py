@@ -12,8 +12,5 @@ MODEL_NAME = os.getenv("OPENAI_MODEL", "openai:gpt-5-mini")
 
 agent = Agent(
     MODEL_NAME,
-    instructions=(
-        "Answer in a short way. Keep replies concise: one or two sentences when possible. "
-        "Do not use bullet lists or long paragraphs unless the user explicitly asks for detail."
-    ),
+    instructions='You are a helpful assistant.',
 )
