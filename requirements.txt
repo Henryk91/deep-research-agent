@@ -1,5 +1,9 @@
-# Pydantic AI with OpenAI support
-pydantic-ai[openai]>=0.0.20
+# Pydantic AI
+pydantic-ai>=0.0.20
+
+# OpenAI model provider and DuckDuckGo search
+openai>=1.0.0
+ddgs>=9.0.0
 
 # Gradio frontend
 gradio>=4.0.0
