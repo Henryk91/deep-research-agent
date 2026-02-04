@@ -9,14 +9,21 @@ load_dotenv()
 
 async def chat_with_agent(message, history):
     """
-    Function to handle the research orchestration.
+    Function to handle the research orchestration with streaming.
     """
     try:
         # Run the deep research orchestration
-        result = await run_research(message)
-        return result
+        log_buffer = "### Research Progress\n"
+        async for update in run_research(message):
+            if update.startswith("📝") or update.startswith(
+                "Topic:"
+            ):  # Final report or synthesis start
+                yield update
+            else:
+                log_buffer += f"> {update}\n\n"
+                yield log_buffer
     except Exception as e:
-        return f"Error during research: {str(e)}"
+        yield f"Error during research: {str(e)}"
 
 
 # Define the Gradio interface

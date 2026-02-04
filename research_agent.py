@@ -137,13 +137,11 @@ writer_agent = Agent(
 
 # Orchestration
 async def run_research(user_query: str):
-    print(f"--- Starting research for: {user_query} ---")
+    yield f"🔎 Starting research for: {user_query}..."
 
     # 1. Classify
     classification = (await classifier_agent.run(user_query)).output
-    print(
-        f"Type: {classification.input_type}, Resolved: {classification.resolved_name}"
-    )
+    yield f"✅ Type: {classification.input_type}, Resolved: {classification.resolved_name}"
 
     # 2. Initial Discovery
     discovery_query = f"{classification.resolved_name} {classification.context}"
@@ -155,7 +153,9 @@ async def run_research(user_query: str):
     print("Discovery Results:")
     for r in discovery_results:
         print(f"Discovery: {r.title}")
+
     # 3. Plan
+    yield f"🤔 Generating research plan..."
     plan = (
         await planner_agent.run(
             f"Topic: {classification.resolved_name}\nContext: {discovery_context}"
@@ -163,15 +163,18 @@ async def run_research(user_query: str):
     ).output
 
     print(f"Generated {len(plan.angles)} angles.")
+    yield f"📋 Plan generated with {len(plan.angles)} research angles."
 
     # 4. Deep Dive (Parallel)
     tasks = []
     for angle in plan.angles:
+        yield f"🕵️ Starting deep dive for: {angle.angle}..."
         tasks.append(run_worker(angle, classification))
 
     section_results = await asyncio.gather(*tasks)
 
     print("Research completed. Starting Synthesis...")
+    yield "📝 Research completed. Synthesizing final report..."
 
     # 5. Synthesize
     synthesis_input = f"Topic: {classification.resolved_name}\n\n"
@@ -186,7 +189,7 @@ async def run_research(user_query: str):
     print("Synthesis complete. Generating final report...")
     final_report = (await writer_agent.run(synthesis_input)).output
     print("Final report generated.")
-    return final_report
+    yield final_report
 
 
 async def run_worker(
