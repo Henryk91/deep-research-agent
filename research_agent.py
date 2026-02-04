@@ -1,6 +1,6 @@
 import asyncio
 import httpx
-from typing import List, Literal
+from typing import List, Literal, Callable, Awaitable
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from ddgs import DDGS
@@ -137,10 +137,14 @@ writer_agent = Agent(
 
 # Orchestration
 async def run_research(user_query: str):
+    print(f"--- Starting research for: {user_query} ---")
     yield f"🔎 Starting research for: {user_query}..."
 
     # 1. Classify
     classification = (await classifier_agent.run(user_query)).output
+    print(
+        f"Type: {classification.input_type}, Resolved: {classification.resolved_name}"
+    )
     yield f"✅ Type: {classification.input_type}, Resolved: {classification.resolved_name}"
 
     # 2. Initial Discovery
@@ -153,6 +157,7 @@ async def run_research(user_query: str):
     print("Discovery Results:")
     for r in discovery_results:
         print(f"Discovery: {r.title}")
+        yield f"📄 Discovery: {r.title}"
 
     # 3. Plan
     yield f"🤔 Generating research plan..."
@@ -166,12 +171,39 @@ async def run_research(user_query: str):
     yield f"📋 Plan generated with {len(plan.angles)} research angles."
 
     # 4. Deep Dive (Parallel)
+    # 4. Deep Dive (Parallel)
+    q = asyncio.Queue()
+
+    async def progress_reporter(msg: str):
+        await q.put(msg)
+
     tasks = []
     for angle in plan.angles:
         yield f"🕵️ Starting deep dive for: {angle.angle}..."
-        tasks.append(run_worker(angle, classification))
+        tasks.append(
+            asyncio.create_task(run_worker(angle, classification, progress_reporter))
+        )
 
-    section_results = await asyncio.gather(*tasks)
+    # Monitor tasks and queue
+    worker_group = asyncio.gather(*tasks)
+
+    while not worker_group.done():
+        get_task = asyncio.create_task(q.get())
+        done, pending = await asyncio.wait(
+            [worker_group, get_task], return_when=asyncio.FIRST_COMPLETED
+        )
+
+        if get_task in done:
+            yield get_task.result()
+        else:
+            # worker_group finished
+            get_task.cancel()
+
+    # Flush remaining messages
+    while not q.empty():
+        yield q.get_nowait()
+
+    section_results = worker_group.result()
 
     print("Research completed. Starting Synthesis...")
     yield "📝 Research completed. Synthesizing final report..."
@@ -187,16 +219,23 @@ async def run_research(user_query: str):
         synthesis_input += "\n"
 
     print("Synthesis complete. Generating final report...")
+    yield "✅ Synthesis complete. Generating final report..."
     final_report = (await writer_agent.run(synthesis_input)).output
     print("Final report generated.")
+    yield "🏁 Final report generated."
     yield final_report
 
 
 async def run_worker(
-    angle: ResearchAngle, classification: QueryClassification
+    angle: ResearchAngle,
+    classification: QueryClassification,
+    progress_callback: Callable[[str], Awaitable[None]],
 ) -> SectionFindings:
     print(
         f"  > Starting worker for '{classification.resolved_name}' angle: {angle.angle}"
+    )
+    await progress_callback(
+        f"🚀 Starting worker for '{classification.resolved_name}' angle: {angle.angle}"
     )
     # Search for this specific angle
     query = f"{classification.resolved_name} {angle.angle}"
@@ -209,9 +248,11 @@ async def run_worker(
             f"Source: {r.title}\nURL: {r.url}\n\nContent:\n{content[:2000]}\n---\n"
         )
     print(f"Found context for {angle.angle} Investigating findings...")
+    await progress_callback(f"🔍 Found context for {angle.angle}. Investigating...")
     prompt = f"Topic: {classification.resolved_name}\nAngle: {angle.angle}\nDescription: {angle.description}\n\nSearch Content:\n{findings_context}"
     result = await worker_agent.run(prompt)
     print(f"Completed investigating findings for {angle.angle}")
+    await progress_callback(f"✅ Completed investigating findings for {angle.angle}")
     return result.output
 
 
