@@ -1,12 +1,7 @@
-# Pydantic AI
-pydantic-ai>=0.0.20
-
-# OpenAI model provider and DuckDuckGo search
-openai>=1.0.0
-ddgs>=9.0.0
-
-# Gradio frontend
-gradio>=4.0.0
-
-# Load .env into environment
-python-dotenv>=1.0.0
+pydantic-ai
+gradio
+python-dotenv
+openai
+ddgs
+httpx
+beautifulsoup4
